@@ -2,6 +2,21 @@ import sys
 import math
 import ROOT as RT
 
+GENIE_STATUS_DEF = {
+    -1 : "kIStUndefined",
+     0 : "kIStInitialState",              # generator-level initial state
+     1 : "kIStStableFinalState",          # generator-level final state: particles to be tracked by detector-level MC
+     2 : "kIStIntermediateState",
+     3 : "kIStDecayedState",
+    10 : "kIStCorrelatedNucleon",
+    11 : "kIStNucleonTarget",
+    12 : "kIStDISPreFragmHadronicState",
+    13 : "kIStPreDecayResonantState",
+    14 : "kIStHadronInTheNucleus",        # hadrons inside the nucleus marked for hadron transport modules to act on
+    15 : "kIStFinalStateNuclearRemnant",  # low energy nuclear fragments entering the record collectively as a 'hadronic blob' pseudo-particle
+    16 : "kIStNucleonClusterTarget",      # for composite nucleons before phase space decay
+ }
+
 class Inspector:
     """Class for a collection of methods to inspect and print information from an event in the
     TTree. Designed to be used in an interactive Python session.
@@ -27,8 +42,8 @@ class Inspector:
         """
         print("Loading files...")
         self.edep_tree = RT.TChain("EDepSimEvents")
-        #self.grtk_tree = RT.TChain("DetSimPassThru/gRooTracker")
-        self.grtk_tree = RT.TChain("gRooTracker")
+        self.grtk_tree = RT.TChain("DetSimPassThru/gRooTracker")
+        # self.grtk_tree = RT.TChain("gRooTracker")
 
         for file in file_list:
             self.edep_tree.Add(file)
@@ -86,6 +101,29 @@ class Inspector:
                                             genie_evt.StdHepP4[p*4 + 2]*1000,
                                             genie_evt.StdHepP4[p*4 + 3]*1000)
             self.nu_pdg = genie_evt.StdHepPdg[p]
+
+    def list_genie_stack(self, status_string=False):
+        """Prints event and particle information from the GENIE record.
+
+        Parameters
+        ----------
+        status_string : bool, optional
+            Flag to print the particle status as a string instead of the enum value
+
+        Returns
+        -------
+        None
+        """
+        genie_evt = self.grtk_tree
+        print("EvtCode: ", genie_evt.EvtCode)
+
+        for p in range(genie_evt.StdHepN):
+            if status_string:
+                p_status = GENIE_STATUS_DEF[genie_evt.StdHepStatus[p]]
+                print("Status: {} | PDG: {:3d}".format(p_status, genie_evt.StdHepPdg[p]))
+            else:
+                print("Status: {:3d} | PDG: {:3d}".format(genie_evt.StdHepStatus[p], genie_evt.StdHepPdg[p]))
+
 
     def list_event_kinematics(self):
         """List event kinematics and information.
@@ -250,12 +288,15 @@ class Inspector:
             for edep in v:
                 prim_id = edep.GetPrimaryId()
                 contrib = edep.GetContributors()
-                if prim_id != trk_id:
-                    continue
+                # if prim_id != trk_id:
+                    # continue
+                # reco_energy += edep.GetEnergyDeposit()
                 # if trk_id not in contrib:
                     # continue
                 # if prim_id == trk_id or trk_id in contrib:
-                reco_energy += edep.GetEnergyDeposit()
+                # if trk_id in contrib:
+                if trk_id == contrib[0]:
+                    reco_energy += edep.GetEnergyDeposit()
 
         return reco_energy
 
