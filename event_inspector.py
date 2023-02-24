@@ -268,15 +268,18 @@ class Inspector:
             if trk.GetPDGCode() == pdg_code:
                 self.trk_print(trk)
 
-    def energy_deposit_trk(self, trk_id):
+    def energy_deposit_trk(self, trk_id, use_primary=False):
         """Get the total energy deposited along the given track as stored
         in SegmentDetectors. The energy deposit is included if the track
-        is the primary contributor.
+        is listed as a contributor by default.
 
         Parameters
         ----------
         track_id : int
             ID of the track to get the energy deposit
+        use_primary : bool, optional
+            Use the PrimaryId of the energy deposit instead of the
+            contributor list when deciding to include the energy
 
         Returns
         -------
@@ -286,16 +289,14 @@ class Inspector:
         segment_det = self.edep_tree.Event.SegmentDetectors
         for k,v in segment_det:
             for edep in v:
-                prim_id = edep.GetPrimaryId()
-                contrib = edep.GetContributors()
-                # if prim_id != trk_id:
-                    # continue
-                # reco_energy += edep.GetEnergyDeposit()
-                # if trk_id not in contrib:
-                    # continue
-                # if prim_id == trk_id or trk_id in contrib:
-                # if trk_id in contrib:
-                if trk_id == contrib[0]:
+                edep_id = -1
+
+                if use_primary:
+                    edep_id = edep.GetPrimaryId()
+                else:
+                    edep_id = edep.GetContributors()[0]
+
+                if trk_id == edep_id:
                     reco_energy += edep.GetEnergyDeposit()
 
         return reco_energy
@@ -342,6 +343,30 @@ class Inspector:
         print("Start : ({:.2f}, {:.2f}, {:.2f})".format(start.X(), start.Y(), start.Z()))
         print("End   : ({:.2f}, {:.2f}, {:.2f})".format(end.X(), end.Y(), end.Z()))
         print("Contained: {}".format(self.is_track_contained(trk)))
+
+    def get_edep_segments(self, trk_id):
+
+        edep_list = []
+        segment_det = self.edep_tree.Event.SegmentDetectors
+        for k,v in segment_det:
+            for edep in v:
+                prim_id = edep.GetPrimaryId()
+                contrib = edep.GetContributors()
+                if trk_id == contrib[0]:
+                    edep_list.append(edep)
+
+        return edep_list
+
+    def list_dedx(self, trk_id):
+
+        edep_list = self.get_edep_segments(trk_id)
+
+        dedx_sum = 0
+        for edep in edep_list:
+            dedx = edep.GetEnergyDeposit() / (edep.GetTrackLength() / 10.0)
+            dedx_sum += dedx
+
+        print(dedx_sum / len(edep_list))
 
     def trk_print(self, trk):
         T = trk.GetInitialMomentum().E() - trk.GetInitialMomentum().M()
